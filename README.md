@@ -2,7 +2,7 @@
 
 **AirMouse is a project for AI Genesis Hackathon 2025 by lablab.ai.**
 
-Control your computer's cursor using hand gestures through your webcam. All processing is done locally on your device for complete privacy and real-time performance.
+Control your computer's cursor using hand gestures through your webcam, no physical mouse required. All processing is done locally on your device for complete privacy and real-time performance.
 
 ## Team: Taurids
 
