@@ -14,7 +14,9 @@
     "dev": "vite",
     "build": "tsc && vite build && electron-builder",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "prod": "npm run build && npx electron ./dist-electron/main.js",
+    "create-builder": "npm run build && electron-builder --config electron-builder.json5"
   },
   "dependencies": {
     "react": "^18.2.0",
