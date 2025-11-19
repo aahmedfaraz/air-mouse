@@ -4,15 +4,26 @@ import './App.css'
 import { Hands, HAND_CONNECTIONS } from '@mediapipe/hands'
 import { drawConnectors, drawLandmarks } from '@mediapipe/drawing_utils'
 
+type GestureEvent =
+  | 'Click'
+  | 'Right click'
+  | 'Mouse down (drag)'
+  | 'Mouse up (drop)'
+  | 'Scroll up'
+  | 'Scroll down'
+
 function App() {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const handsRef = useRef<Hands | null>(null)
   const animationFrameRef = useRef<number | null>(null)
   const trackingActiveRef = useRef(false)
+  const sensitivityRef = useRef(1) // 1 = default, higher = more sensitive
 
   const [error, setError] = useState<string | null>(null)
   const [isTrackingActive, setIsTrackingActive] = useState(false)
+  const [lastGesture, setLastGesture] = useState<GestureEvent | null>(null)
+  const [sensitivity, setSensitivity] = useState(1)
 
   useEffect(() => {
     let isCancelled = false
@@ -21,7 +32,35 @@ function App() {
     type HandState = 'open' | 'closed' | 'unknown'
     let lastHandState: HandState = 'unknown'
     let closeCount = 0
-    let lastGestureTimestamp = 0
+    let lastToggleTimestamp = 0
+
+    // Track fine-grained gestures (click, right-click, drag, scroll)
+    let wasPinched = false
+    let pinchStartTime = 0
+    let lastTapTime = 0
+    let tapCount = 0
+    let isDraggingGesture = false
+
+    // Continuous gestures keep label while active (drag, scroll)
+    let continuousGesture: GestureEvent | null = null
+    let continuousGestureLastTime = 0
+
+    // Timeout for transient gestures (click, right-click, drop)
+    let transientTimeoutId: number | null = null
+
+    const showTransientGesture = (label: GestureEvent) => {
+      setLastGesture(label)
+      if (transientTimeoutId !== null) {
+        window.clearTimeout(transientTimeoutId)
+      }
+      transientTimeoutId = window.setTimeout(() => {
+        // Only clear if no continuous gesture is currently active
+        if (continuousGesture === null) {
+          setLastGesture(null)
+        }
+        transientTimeoutId = null
+      }, 800)
+    }
 
     const classifyHandState = (
       landmarks: readonly { x: number; y: number; z: number }[],
@@ -105,29 +144,33 @@ function App() {
           if (results.multiHandLandmarks && results.multiHandLandmarks.length) {
             const now = performance.now()
 
-            // Use the first detected hand for gesture toggling
+            // Use the first detected hand for toggle + gesture logic
             const primary = results.multiHandLandmarks[0]
             const currentState = classifyHandState(primary)
 
+            // ---- Tracking toggle (open/close 3x) ----
             if (currentState === 'unknown') {
               lastHandState = 'unknown'
               closeCount = 0
             } else {
               const MAX_SEQUENCE_MS = 5000
 
-              if (now - lastGestureTimestamp > MAX_SEQUENCE_MS) {
+              if (now - lastToggleTimestamp > MAX_SEQUENCE_MS) {
                 closeCount = 0
               }
 
-              // Count a "close" gesture that follows an "open" one
               if (lastHandState === 'open' && currentState === 'closed') {
                 closeCount += 1
-                lastGestureTimestamp = now
+                lastToggleTimestamp = now
 
                 if (closeCount >= 3) {
                   setIsTrackingActive((prev) => {
                     const next = !prev
                     trackingActiveRef.current = next
+                    if (!next) {
+                      // When turning tracking off, clear gesture
+                      setLastGesture(null)
+                    }
                     return next
                   })
                   closeCount = 0
@@ -135,6 +178,133 @@ function App() {
               }
 
               lastHandState = currentState
+            }
+
+            // ---- Gesture events (only when tracking is ON) ----
+            if (trackingActiveRef.current) {
+              const thumbTip = primary[4]
+              const indexTip = primary[8]
+              const wrist = primary[0]
+
+              const dist = (a: { x: number; y: number }, b: { x: number; y: number }) =>
+                Math.hypot(a.x - b.x, a.y - b.y)
+
+              const pinchDistance = dist(thumbTip, indexTip)
+
+              // Sensitivity tuning: higher slider value => easier to trigger
+              const rawSensitivity = sensitivityRef.current
+              const sens = Math.min(1.5, Math.max(0.5, rawSensitivity))
+
+              // Pinch threshold: larger with more sensitivity
+              const PINCH_THRESHOLD = 0.045 + (sens - 1) * 0.02
+              const isPinched = pinchDistance < PINCH_THRESHOLD
+
+              const distToWrist = (i: number) => dist(primary[i], wrist)
+
+              // Extension threshold: smaller with more sensitivity
+              const EXT_THRESHOLD = 0.19 - (sens - 1) * 0.04
+
+              const indexExtended = distToWrist(8) > EXT_THRESHOLD
+              const middleExtended = distToWrist(12) > EXT_THRESHOLD
+              const ringExtended = distToWrist(16) > EXT_THRESHOLD
+              const pinkyExtended = distToWrist(20) > EXT_THRESHOLD
+
+              const SHORT_TAP_MAX_MS = 250
+              const DOUBLE_TAP_WINDOW_MS = 450
+              const DRAG_HOLD_MS = 300
+
+              // Pinch start
+              if (isPinched && !wasPinched) {
+                wasPinched = true
+                pinchStartTime = now
+              }
+
+              // Pinch end -> click / right-click / drop
+              if (!isPinched && wasPinched) {
+                const heldMs = now - pinchStartTime
+                wasPinched = false
+
+                if (heldMs >= DRAG_HOLD_MS && isDraggingGesture) {
+                  // Mouse up after drag
+                  showTransientGesture('Mouse up (drop)')
+                  isDraggingGesture = false
+                  continuousGesture = null
+                } else if (heldMs < SHORT_TAP_MAX_MS) {
+                  // Quick tap(s) for click / right-click
+                  if (now - lastTapTime < DOUBLE_TAP_WINDOW_MS) {
+                    tapCount += 1
+                  } else {
+                    tapCount = 1
+                  }
+                  lastTapTime = now
+
+                  if (tapCount === 2) {
+                    showTransientGesture('Right click')
+                    tapCount = 0
+                  } else {
+                    showTransientGesture('Click')
+                  }
+                }
+              }
+
+              // Drag start
+              if (isPinched) {
+                const heldMs = now - pinchStartTime
+                if (!isDraggingGesture && heldMs >= DRAG_HOLD_MS) {
+                  isDraggingGesture = true
+                  continuousGesture = 'Mouse down (drag)'
+                  continuousGestureLastTime = now
+                  setLastGesture('Mouse down (drag)')
+                }
+              }
+
+              // Scroll gestures (only when not pinched)
+              if (!isPinched) {
+                const onlyIndexExtended =
+                  indexExtended &&
+                  !middleExtended &&
+                  !ringExtended &&
+                  !pinkyExtended
+
+                const indexAndMiddleExtended =
+                  indexExtended &&
+                  middleExtended &&
+                  !ringExtended &&
+                  !pinkyExtended
+
+                if (onlyIndexExtended) {
+                  continuousGesture = 'Scroll up'
+                  continuousGestureLastTime = now
+                  setLastGesture('Scroll up')
+                } else if (indexAndMiddleExtended) {
+                  continuousGesture = 'Scroll down'
+                  continuousGestureLastTime = now
+                  setLastGesture('Scroll down')
+                } else if (
+                  continuousGesture === 'Scroll up' ||
+                  continuousGesture === 'Scroll down'
+                ) {
+                  // Pose changed away from scroll; clear after short delay
+                  if (now - continuousGestureLastTime > 200) {
+                    continuousGesture = null
+                    if (transientTimeoutId === null) {
+                      setLastGesture(null)
+                    }
+                  }
+                }
+              }
+
+              // Drag ended (no pinch, some time passed)
+              if (
+                continuousGesture === 'Mouse down (drag)' &&
+                !isPinched &&
+                now - continuousGestureLastTime > 200
+              ) {
+                continuousGesture = null
+                if (transientTimeoutId === null) {
+                  setLastGesture(null)
+                }
+              }
             }
 
             // Subtle, less intense glow for the hand skeleton
@@ -219,6 +389,51 @@ function App() {
         className="absolute inset-0 w-full h-full object-cover"
       />
 
+      {/* Gesture help (top-left) */}
+      {isTrackingActive && (
+        <div className="gesture-help">
+          <h2 className="gesture-help-title">Gesture controls</h2>
+          <ul className="gesture-help-list">
+            <li>
+              <span className="label">Click</span>
+              <span className="detail">
+                Tap thumb &amp; index together once quickly
+              </span>
+            </li>
+            <li>
+              <span className="label">Right click</span>
+              <span className="detail">
+                Tap thumb &amp; index together twice quickly
+              </span>
+            </li>
+            <li>
+              <span className="label">Mouse down (drag)</span>
+              <span className="detail">
+                Keep thumb &amp; index pinched together
+              </span>
+            </li>
+            <li>
+              <span className="label">Mouse up (drop)</span>
+              <span className="detail">
+                Release the pinch after dragging
+              </span>
+            </li>
+            <li>
+              <span className="label">Scroll up</span>
+              <span className="detail">
+                Only index finger extended, others closed
+              </span>
+            </li>
+            <li>
+              <span className="label">Scroll down</span>
+              <span className="detail">
+                Index &amp; middle extended, others closed
+              </span>
+            </li>
+          </ul>
+        </div>
+      )}
+
       {/* Center content overlay */}
       <div className="relative z-10 flex items-center justify-center min-h-screen px-4">
         <div className="hero-card">
@@ -277,6 +492,35 @@ function App() {
               to toggle <span className="app-name">AirMouse tracking</span> on
               or off.
             </p>
+          </div>
+
+          <div className="sensitivity-control">
+            <span className="sensitivity-label">Gesture sensitivity</span>
+            <input
+              type="range"
+              min="0.5"
+              max="1.5"
+              step="0.1"
+              value={sensitivity}
+              onChange={(e) => {
+                const value = Number(e.target.value)
+                setSensitivity(value)
+                sensitivityRef.current = value
+              }}
+            />
+            <span className="sensitivity-value">
+              {sensitivity.toFixed(1)}x
+            </span>
+          </div>
+
+          <div
+            className={`gesture-indicator ${
+              lastGesture ? 'gesture-indicator--visible' : 'gesture-indicator--hidden'
+            }`}
+          >
+            <span className="gesture-indicator-value">
+              {lastGesture ?? '\u00A0'}
+            </span>
           </div>
 
           {error && <p className="hero-error">{error}</p>}
