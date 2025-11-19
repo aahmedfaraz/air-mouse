@@ -1,11 +1,7 @@
 {
-  "name": "airmouse",
-  "version": "1.0.0",
-  "description": "AirMouse can be used to replace your physical mouse with your hand gestures detected by your webcam.",
-  "build": {
-    "productName": "AirMouse"
-  },
+  "name": "air-mouse-2",
   "private": true,
+  "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
