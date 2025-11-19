@@ -220,14 +220,39 @@ function App() {
       />
 
       {/* Center content overlay */}
-      <div className="relative z-10 flex items-center justify-center min-h-screen pointer-events-none px-4">
+      <div className="relative z-10 flex items-center justify-center min-h-screen px-4">
         <div className="hero-card">
           <h1 className="hero-title">AirMouse</h1>
           <p className="hero-subtitle">
             Control your cursor with just your hand — no physical mouse needed.
           </p>
           <p className="hero-team">
-            <span>Team Taurids</span> — Ahmed Faraz &amp; Abdullah Khetran
+            <span>Team Taurids</span> —{' '}
+            <button
+              type="button"
+              className="hero-link"
+              onClick={() =>
+                window.ipcRenderer?.send(
+                  'open-external',
+                  'https://www.linkedin.com/in/aahmedfaraz/',
+                )
+              }
+            >
+              Ahmed Faraz
+            </button>{' '}
+            &amp;{' '}
+            <button
+              type="button"
+              className="hero-link"
+              onClick={() =>
+                window.ipcRenderer?.send(
+                  'open-external',
+                  'https://www.linkedin.com/in/abdullah-khetran/',
+                )
+              }
+            >
+              Abdullah Khetran
+            </button>
           </p>
           <p className="hero-tagline">AI Genesis Hackathon 2025 • lablab.ai</p>
 

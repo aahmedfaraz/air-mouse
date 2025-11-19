@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 
@@ -64,3 +64,15 @@ app.on('activate', () => {
 })
 
 app.whenReady().then(createWindow)
+
+// Open external links in the user's default browser
+ipcMain.on('open-external', (_event, url: string) => {
+  if (typeof url === 'string' && url.trim().length > 0) {
+    // Basic safety: only allow http(s) URLs
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      shell.openExternal(url).catch((err) => {
+        console.error('Failed to open external URL:', err)
+      })
+    }
+  }
+})

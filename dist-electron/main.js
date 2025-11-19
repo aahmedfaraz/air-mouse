@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, ipcMain, shell } from "electron";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 const __dirname$1 = path.dirname(fileURLToPath(import.meta.url));
@@ -36,6 +36,15 @@ app.on("activate", () => {
   }
 });
 app.whenReady().then(createWindow);
+ipcMain.on("open-external", (_event, url) => {
+  if (typeof url === "string" && url.trim().length > 0) {
+    if (url.startsWith("http://") || url.startsWith("https://")) {
+      shell.openExternal(url).catch((err) => {
+        console.error("Failed to open external URL:", err);
+      });
+    }
+  }
+});
 export {
   MAIN_DIST,
   RENDERER_DIST,
