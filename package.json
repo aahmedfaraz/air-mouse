@@ -1,7 +1,14 @@
 {
-  "name": "air-mouse-2",
+  "name": "airmouse",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
+  "description": "AirMouse is a cross-platform application that allows users to control their computer's mouse using hand gestures detected through a webcam.",
+  "build": {
+    "productName": "AirMouse",
+    "appId": "com.airmouse.app"
+  },
+  "author": "Ahmed Faraz | Abdullah Khetran",
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "dev": "vite",
