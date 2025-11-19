@@ -18,15 +18,18 @@
     "artifactName": "${productName}-Mac-${version}-Installer.${ext}"
   },
   "win": {
+    // During debugging/build failures on Windows the NSIS step can fail
+    // (makensis mmap errors). Use a simple zip target to avoid NSIS while
+    // we iterate on packaging. Change back to NSIS when installer is needed.
     "target": [
       {
-        "target": "nsis",
+        "target": "zip",
         "arch": [
           "x64"
         ]
       }
     ],
-    "artifactName": "${productName}-Windows-${version}-Setup.${ext}"
+    "artifactName": "${productName}-Windows-${version}.${ext}"
   },
   "nsis": {
     "oneClick": false,
