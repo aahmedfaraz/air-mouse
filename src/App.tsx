@@ -9,11 +9,41 @@ function App() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const handsRef = useRef<Hands | null>(null)
   const animationFrameRef = useRef<number | null>(null)
+  const trackingActiveRef = useRef(false)
 
   const [error, setError] = useState<string | null>(null)
+  const [isTrackingActive, setIsTrackingActive] = useState(false)
 
   useEffect(() => {
     let isCancelled = false
+
+    // Track gesture sequences to toggle tracking (open/close hand 3 times)
+    type HandState = 'open' | 'closed' | 'unknown'
+    let lastHandState: HandState = 'unknown'
+    let closeCount = 0
+    let lastGestureTimestamp = 0
+
+    const classifyHandState = (
+      landmarks: readonly { x: number; y: number; z: number }[],
+    ): HandState => {
+      if (!landmarks.length) return 'unknown'
+
+      const wrist = landmarks[0]
+      const tipIndices = [4, 8, 12, 16, 20]
+
+      const distances = tipIndices.map((i) => {
+        const tip = landmarks[i]
+        const dx = tip.x - wrist.x
+        const dy = tip.y - wrist.y
+        return Math.hypot(dx, dy)
+      })
+
+      const avgDistance =
+        distances.reduce((sum, d) => sum + d, 0) / distances.length
+
+      // Heuristic threshold: larger average distance => fingers more extended
+      return avgDistance > 0.18 ? 'open' : 'closed'
+    }
 
     async function setupCameraAndHands() {
       try {
@@ -73,19 +103,57 @@ function App() {
           ctx.fillRect(0, 0, canvas.width, canvas.height)
 
           if (results.multiHandLandmarks && results.multiHandLandmarks.length) {
+            const now = performance.now()
+
+            // Use the first detected hand for gesture toggling
+            const primary = results.multiHandLandmarks[0]
+            const currentState = classifyHandState(primary)
+
+            if (currentState === 'unknown') {
+              lastHandState = 'unknown'
+              closeCount = 0
+            } else {
+              const MAX_SEQUENCE_MS = 5000
+
+              if (now - lastGestureTimestamp > MAX_SEQUENCE_MS) {
+                closeCount = 0
+              }
+
+              // Count a "close" gesture that follows an "open" one
+              if (lastHandState === 'open' && currentState === 'closed') {
+                closeCount += 1
+                lastGestureTimestamp = now
+
+                if (closeCount >= 3) {
+                  setIsTrackingActive((prev) => {
+                    const next = !prev
+                    trackingActiveRef.current = next
+                    return next
+                  })
+                  closeCount = 0
+                }
+              }
+
+              lastHandState = currentState
+            }
+
             // Subtle, less intense glow for the hand skeleton
             ctx.shadowColor = 'rgba(148, 163, 184, 0.4)' // slate-400
             ctx.shadowBlur = 6
 
+            const active = trackingActiveRef.current
+            const lineColor = active ? '#f97316' : '#e5e7eb' // orange-500 vs neutral-200
+            const dotColor = active ? '#fed7aa' : '#e5e7eb' // orange-200 vs neutral-200
+
             for (const landmarks of results.multiHandLandmarks) {
               drawConnectors(ctx, landmarks, HAND_CONNECTIONS, {
-                color: '#e5e7eb', // neutral-200 lines
-                lineWidth: 2.2,
+                color: lineColor,
+                lineWidth: active ? 2.6 : 2.1,
               })
               drawLandmarks(ctx, landmarks, {
-                color: '#e5e7eb', // neutral-200 dots
-                lineWidth: 1.1,
-                radius: 3.2,
+                color: dotColor,
+                lineWidth: active ? 1.3 : 1.0,
+                radius: active ? 3.4 : 3.0,
               })
             }
 
@@ -153,46 +221,40 @@ function App() {
 
       {/* Center content overlay */}
       <div className="relative z-10 flex items-center justify-center min-h-screen pointer-events-none px-4">
-        <div className="bg-slate-900/80 backdrop-blur-xl text-center px-8 py-6 rounded-2xl shadow-2xl max-w-xl">
-          <h1
-            className="text-4xl sm:text-5xl font-extrabold bg-clip-text text-transparent mb-3 tracking-tight"
-            style={{
-              backgroundImage:
-                'linear-gradient(to right, #fb923c, #fbbf24, #f97316, #fb7185)',
-              WebkitBackgroundClip: 'text',
-              backgroundClip: 'text',
-              color: 'transparent',
-            }}
-          >
-            AirMouse
-          </h1>
-          <p
-            className="text-white text-base sm:text-lg mb-2"
-            style={{ color: '#ffffff' }}
-          >
+        <div className="hero-card">
+          <h1 className="hero-title">AirMouse</h1>
+          <p className="hero-subtitle">
             Control your cursor with just your hand — no physical mouse needed.
           </p>
-          <p
-            className="text-white text-sm sm:text-base mb-4"
-            style={{ color: '#ffffff' }}
-          >
+          <p className="hero-team">
+            <span>Team Taurids</span> — Ahmed Faraz &amp; Abdullah Khetran
+          </p>
+          <p className="hero-tagline">AI Genesis Hackathon 2025 • lablab.ai</p>
+
+          <div className="hero-status">
             <span
-              className="font-semibold text-white"
-              style={{ color: '#ffffff' }}
+              className={`hero-status-pill ${
+                isTrackingActive
+                  ? 'hero-status-pill--active'
+                  : 'hero-status-pill--idle'
+              }`}
             >
-              Team Taurids
-            </span>{' '}
-            &mdash; Ahmed Faraz &amp; Abdullah Khetran
-          </p>
-          <p
-            className="text-white text-xs sm:text-sm uppercase tracking-[0.2em]"
-            style={{ color: '#ffffff' }}
-          >
-            AI Genesis Hackathon 2025 &bull; lablab.ai
-          </p>
-          {error && (
-            <p className="mt-3 text-xs text-rose-300 font-medium">{error}</p>
-          )}
+              <span
+                className={`hero-status-dot ${
+                  isTrackingActive ? 'hero-status-dot--active' : ''
+                }`}
+              />
+              {isTrackingActive ? 'Tracking enabled' : 'Tracking paused'}
+            </span>
+            <p className="hero-status-instruction">
+              Open and close your hand{' '}
+              <span className="highlight">3 times</span> in front of the camera
+              to toggle <span className="app-name">AirMouse tracking</span> on
+              or off.
+            </p>
+          </div>
+
+          {error && <p className="hero-error">{error}</p>}
         </div>
       </div>
 

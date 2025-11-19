@@ -1,0 +1,128 @@
+
+/* HERO OVERLAY CARD */
+
+.hero-card {
+  background-color: transparent;
+  backdrop-filter: none;
+  padding: 1.75rem 2rem;
+  border-radius: 1.25rem;
+  box-shadow: none;
+  max-width: 32rem;
+  text-align: center;
+}
+
+@media (min-width: 640px) {
+  .hero-card {
+    padding: 2rem 2.5rem;
+  }
+}
+
+.hero-title {
+  font-size: clamp(2.4rem, 3.8vw, 3.2rem);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  margin-bottom: 0.85rem;
+  background-image: linear-gradient(
+    to right,
+    #fb923c,
+    #fbbf24,
+    #f97316,
+    #fb7185
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.hero-subtitle {
+  color: #f9fafb;
+  font-size: 1.05rem;
+  margin-bottom: 0.5rem;
+}
+
+.hero-team {
+  color: #e5e7eb;
+  font-size: 0.95rem;
+  margin-bottom: 1rem;
+}
+
+.hero-team span {
+  font-weight: 600;
+  color: #fed7aa;
+}
+
+.hero-tagline {
+  color: #e5e7eb;
+  font-size: 0.8rem;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+}
+
+.hero-status {
+  margin-top: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.hero-status-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 9999px;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border-width: 1px;
+  border-style: solid;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.7);
+}
+
+.hero-status-pill--active {
+  background-color: rgba(16, 185, 129, 0.18); /* emerald-500/18 */
+  color: #a7f3d0;
+  border-color: rgba(52, 211, 153, 0.7);
+}
+
+.hero-status-pill--idle {
+  background-color: rgba(15, 23, 42, 0.9); /* slate-900/90 */
+  color: #f9fafb;
+  border-color: rgba(148, 163, 184, 0.85);
+}
+
+.hero-status-dot {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 9999px;
+  margin-right: 0.4rem;
+  background-color: #e5e7eb;
+}
+
+.hero-status-dot--active {
+  background-color: #6ee7b7;
+}
+
+.hero-status-instruction {
+  color: #f9fafb;
+  font-size: 0.85rem;
+  max-width: 20rem;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.hero-status-instruction .highlight {
+  color: #fbbf24;
+  font-weight: 600;
+}
+
+.hero-status-instruction .app-name {
+  font-weight: 600;
+}
+
+.hero-error {
+  margin-top: 0.75rem;
+  font-size: 0.75rem;
+  color: #fb7185; /* rose-400 */
+}
+
