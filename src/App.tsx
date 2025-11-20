@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import './App.css'
 
-import { drawConnectors, drawLandmarks } from '@mediapipe/drawing_utils'
-
 type GestureEvent =
   | 'Click'
   | 'Right click'
@@ -14,7 +12,6 @@ type GestureEvent =
 function App() {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
-  // Use a loose type here because Hands comes from a dynamic Mediapipe import
   const handsRef = useRef<any | null>(null)
   const animationFrameRef = useRef<number | null>(null)
   const trackingActiveRef = useRef(false)
@@ -105,12 +102,38 @@ function App() {
           }
         })
 
-        // Dynamically import MediaPipe Hands so it works in both dev and build
-        const mpHands: any = await import('@mediapipe/hands')
-        const HandsCtor: any =
-          mpHands?.Hands ?? mpHands?.default?.Hands ?? mpHands?.default ?? mpHands
-        const HAND_CONNECTIONS: any =
-          mpHands?.HAND_CONNECTIONS ?? mpHands?.default?.HAND_CONNECTIONS
+        // Ensure MediaPipe Hands and drawing utils scripts are loaded (globals)
+        const ensureScript = (globalKey: string, src: string) =>
+          new Promise<void>((resolve, reject) => {
+            if ((window as any)[globalKey]) {
+              resolve()
+              return
+            }
+
+            const script = document.createElement('script')
+            script.src = src
+            script.async = true
+            script.onload = () => resolve()
+            script.onerror = () =>
+              reject(new Error(`Failed to load script: ${src}`))
+            document.body.appendChild(script)
+          })
+
+        await Promise.all([
+          ensureScript(
+            'Hands',
+            'https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js',
+          ),
+          ensureScript(
+            'drawConnectors',
+            'https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js',
+          ),
+        ])
+
+        const HandsCtor: any = (window as any).Hands
+        const HAND_CONNECTIONS: any = (window as any).HAND_CONNECTIONS
+        const drawConnectorsFn: any = (window as any).drawConnectors
+        const drawLandmarksFn: any = (window as any).drawLandmarks
 
         const hands = new HandsCtor({
           locateFile: (file: string) =>
@@ -347,11 +370,11 @@ function App() {
             const dotColor = active ? '#fed7aa' : '#e5e7eb' // orange-200 vs neutral-200
 
             for (const landmarks of results.multiHandLandmarks) {
-              drawConnectors(ctx, landmarks, HAND_CONNECTIONS, {
+              drawConnectorsFn(ctx, landmarks, HAND_CONNECTIONS, {
                 color: lineColor,
                 lineWidth: active ? 2.6 : 2.1,
               })
-              drawLandmarks(ctx, landmarks, {
+              drawLandmarksFn(ctx, landmarks, {
                 color: dotColor,
                 lineWidth: active ? 1.3 : 1.0,
                 radius: active ? 3.4 : 3.0,
