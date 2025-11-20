@@ -146,9 +146,10 @@ function App() {
 
             // Use the first detected hand for toggle + gesture logic
             const primary = results.multiHandLandmarks[0]
-            const currentState = classifyHandState(primary)
 
             // ---- Tracking toggle (open/close 3x) ----
+            const currentState = classifyHandState(primary)
+
             if (currentState === 'unknown') {
               lastHandState = 'unknown'
               closeCount = 0
@@ -159,6 +160,7 @@ function App() {
                 closeCount = 0
               }
 
+              // Count a "close" gesture that follows an "open" one
               if (lastHandState === 'open' && currentState === 'closed') {
                 closeCount += 1
                 lastToggleTimestamp = now
@@ -167,8 +169,8 @@ function App() {
                   setIsTrackingActive((prev) => {
                     const next = !prev
                     trackingActiveRef.current = next
+                    // When turning tracking off, clear gesture and help
                     if (!next) {
-                      // When turning tracking off, clear gesture
                       setLastGesture(null)
                     }
                     return next
@@ -219,7 +221,7 @@ function App() {
                 pinchStartTime = now
               }
 
-              // Pinch end -> click / right-click / drop
+              // Pinch end -> click / right-click / drop (logical events only)
               if (!isPinched && wasPinched) {
                 const heldMs = now - pinchStartTime
                 wasPinched = false
