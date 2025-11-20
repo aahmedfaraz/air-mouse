@@ -30,7 +30,7 @@ function App() {
     type HandState = 'open' | 'closed' | 'unknown'
     let lastHandState: HandState = 'unknown'
     let closeCount = 0
-    let lastToggleTimestamp = 0
+    let firstCloseTimestamp = 0
 
     // Track fine-grained gestures (click, right-click, drag, scroll)
     let wasPinched = false
@@ -178,35 +178,38 @@ function App() {
             // Use the first detected hand for toggle + gesture logic
             const primary = results.multiHandLandmarks[0]
 
-            // ---- Tracking toggle (open/close 3x) ----
+            // ---- Tracking toggle (open/close 3x within 5s) ----
             const currentState = classifyHandState(primary)
 
             if (currentState === 'unknown') {
               lastHandState = 'unknown'
               closeCount = 0
+              firstCloseTimestamp = 0
             } else {
-              const MAX_SEQUENCE_MS = 5000
+              const MAX_SEQUENCE_MS = 3000
 
-              if (now - lastToggleTimestamp > MAX_SEQUENCE_MS) {
-                closeCount = 0
-              }
-
-              // Count a "close" gesture that follows an "open" one
+              // Detect open -> closed transitions
               if (lastHandState === 'open' && currentState === 'closed') {
-                closeCount += 1
-                lastToggleTimestamp = now
+                if (closeCount === 0 || now - firstCloseTimestamp > MAX_SEQUENCE_MS) {
+                  // Start a new sequence
+                  closeCount = 1
+                  firstCloseTimestamp = now
+                } else {
+                  closeCount += 1
+                }
 
-                if (closeCount >= 3) {
+                if (closeCount >= 3 && now - firstCloseTimestamp <= MAX_SEQUENCE_MS) {
                   setIsTrackingActive((prev) => {
                     const next = !prev
                     trackingActiveRef.current = next
-                    // When turning tracking off, clear gesture and help
                     if (!next) {
                       setLastGesture(null)
                     }
                     return next
                   })
+                  // Reset sequence after a successful toggle
                   closeCount = 0
+                  firstCloseTimestamp = 0
                 }
               }
 
