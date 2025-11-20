@@ -182,7 +182,7 @@ function App() {
               lastHandState = currentState
             }
 
-            // ---- Gesture events (only when tracking is ON) ----
+            // ---- Gesture events & cursor control (only when tracking is ON) ----
             if (trackingActiveRef.current) {
               const thumbTip = primary[4]
               const indexTip = primary[8]
@@ -215,13 +215,22 @@ function App() {
               const DOUBLE_TAP_WINDOW_MS = 450
               const DRAG_HOLD_MS = 300
 
+              // Map thumb tip to normalized screen coordinates and send to main
+              // Use direct x so cursor moves in same left/right direction as thumb.
+              const normalizedX = Math.min(Math.max(thumbTip.x, 0), 1)
+              const normalizedY = Math.min(Math.max(thumbTip.y, 0), 1)
+              window.ipcRenderer?.send('cursor:move', {
+                x: normalizedX,
+                y: normalizedY,
+              })
+
               // Pinch start
               if (isPinched && !wasPinched) {
                 wasPinched = true
                 pinchStartTime = now
               }
 
-              // Pinch end -> click / right-click / drop (logical events only)
+              // Pinch end -> click / right-click / drop
               if (!isPinched && wasPinched) {
                 const heldMs = now - pinchStartTime
                 wasPinched = false
@@ -229,6 +238,7 @@ function App() {
                 if (heldMs >= DRAG_HOLD_MS && isDraggingGesture) {
                   // Mouse up after drag
                   showTransientGesture('Mouse up (drop)')
+                  window.ipcRenderer?.send('cursor:mouseup', { button: 'left' })
                   isDraggingGesture = false
                   continuousGesture = null
                 } else if (heldMs < SHORT_TAP_MAX_MS) {
@@ -242,9 +252,11 @@ function App() {
 
                   if (tapCount === 2) {
                     showTransientGesture('Right click')
+                    window.ipcRenderer?.send('cursor:click', { button: 'right' })
                     tapCount = 0
                   } else {
                     showTransientGesture('Click')
+                    window.ipcRenderer?.send('cursor:click', { button: 'left' })
                   }
                 }
               }
@@ -257,6 +269,7 @@ function App() {
                   continuousGesture = 'Mouse down (drag)'
                   continuousGestureLastTime = now
                   setLastGesture('Mouse down (drag)')
+                  window.ipcRenderer?.send('cursor:mousedown', { button: 'left' })
                 }
               }
 
@@ -278,10 +291,18 @@ function App() {
                   continuousGesture = 'Scroll up'
                   continuousGestureLastTime = now
                   setLastGesture('Scroll up')
+                  window.ipcRenderer?.send('cursor:scroll', {
+                    direction: 'up',
+                    amount: 3,
+                  })
                 } else if (indexAndMiddleExtended) {
                   continuousGesture = 'Scroll down'
                   continuousGestureLastTime = now
                   setLastGesture('Scroll down')
+                  window.ipcRenderer?.send('cursor:scroll', {
+                    direction: 'down',
+                    amount: 3,
+                  })
                 } else if (
                   continuousGesture === 'Scroll up' ||
                   continuousGesture === 'Scroll down'
@@ -328,36 +349,6 @@ function App() {
                 radius: active ? 3.4 : 3.0,
               })
             }
-
-            // Draw a virtual cursor shaped like the Windows arrow at the thumb tip
-            const thumb = primary[4]
-            const cursorX = thumb.x * canvas.width
-            const cursorY = thumb.y * canvas.height
-
-            ctx.save()
-            ctx.translate(cursorX, cursorY)
-            ctx.scale(1.2, 1.2)
-            ctx.shadowColor = 'rgba(15, 23, 42, 0.9)' // dark glow
-            ctx.shadowBlur = 14
-
-            ctx.beginPath()
-            // Arrow shape pointing up-left, similar to Windows cursor
-            ctx.moveTo(0, 0)
-            ctx.lineTo(0, 22)
-            ctx.lineTo(5, 17)
-            ctx.lineTo(9, 26)
-            ctx.lineTo(13, 24)
-            ctx.lineTo(9, 15)
-            ctx.lineTo(18, 15)
-            ctx.closePath()
-
-            ctx.fillStyle = '#ffffff'
-            ctx.fill()
-            ctx.lineWidth = 1.5
-            ctx.strokeStyle = '#020617' // slate-950 edge
-            ctx.stroke()
-
-            ctx.restore()
 
             ctx.shadowBlur = 0
           }

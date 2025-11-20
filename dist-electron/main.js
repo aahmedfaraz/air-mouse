@@ -45,6 +45,69 @@ ipcMain.on("open-external", (_event, url) => {
     }
   }
 });
+let nut = null;
+async function ensureNut() {
+  if (!nut) {
+    nut = await import("@nut-tree-fork/nut-js");
+  }
+}
+ipcMain.on("cursor:move", async (_event, payload) => {
+  try {
+    await ensureNut();
+    if (!nut) return;
+    const width = await nut.screen.width();
+    const height = await nut.screen.height();
+    const targetX = Math.round(Math.min(Math.max(payload.x, 0), 1) * width);
+    const targetY = Math.round(Math.min(Math.max(payload.y, 0), 1) * height);
+    await nut.mouse.setPosition(new nut.Point(targetX, targetY));
+  } catch (err) {
+    console.error("Failed to move cursor:", err);
+  }
+});
+ipcMain.on("cursor:click", async (_event, payload) => {
+  try {
+    await ensureNut();
+    if (!nut) return;
+    const btn = payload.button === "right" ? nut.Button.RIGHT : nut.Button.LEFT;
+    await nut.mouse.click(btn);
+  } catch (err) {
+    console.error("Failed to click:", err);
+  }
+});
+ipcMain.on("cursor:mousedown", async (_event, payload) => {
+  try {
+    await ensureNut();
+    if (!nut) return;
+    const btn = payload.button === "right" ? nut.Button.RIGHT : nut.Button.LEFT;
+    await nut.mouse.pressButton(btn);
+  } catch (err) {
+    console.error("Failed to mouse down:", err);
+  }
+});
+ipcMain.on("cursor:mouseup", async (_event, payload) => {
+  try {
+    await ensureNut();
+    if (!nut) return;
+    const btn = payload.button === "right" ? nut.Button.RIGHT : nut.Button.LEFT;
+    await nut.mouse.releaseButton(btn);
+  } catch (err) {
+    console.error("Failed to mouse up:", err);
+  }
+});
+ipcMain.on("cursor:scroll", async (_event, payload) => {
+  try {
+    await ensureNut();
+    if (!nut) return;
+    const amount = payload.amount ?? 3;
+    if (payload.direction === "up") {
+      await nut.mouse.scrollUp(amount);
+    } else {
+      await nut.mouse.scrollDown(amount);
+    }
+  } catch (err) {
+    console.error("Failed to scroll:", err);
+  }
+});
 export {
   MAIN_DIST,
   RENDERER_DIST,
