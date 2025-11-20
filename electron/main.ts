@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, shell, Tray, Menu, nativeImage } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 
@@ -23,6 +23,8 @@ export const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist')
 process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, 'public') : RENDERER_DIST
 
 let win: BrowserWindow | null
+let tray: Tray | null = null
+let isQuitting = false
 
 function createWindow() {
   win = new BrowserWindow({
@@ -37,11 +39,54 @@ function createWindow() {
     win?.webContents.send('main-process-message', (new Date).toLocaleString())
   })
 
+  win.on('close', (event) => {
+    if (!isQuitting) {
+      event.preventDefault()
+      win?.hide()
+    }
+  })
+
   if (VITE_DEV_SERVER_URL) {
     win.loadURL(VITE_DEV_SERVER_URL)
   } else {
-    // win.loadFile('dist/index.html')
     win.loadFile(path.join(RENDERER_DIST, 'index.html'))
+  }
+
+  // Create tray icon so app can live in background
+  if (!tray) {
+    // Use an in-memory empty icon to avoid missing-file issues after packaging.
+    const emptyIcon = nativeImage.createEmpty()
+    tray = new Tray(emptyIcon)
+    tray.setToolTip('AirMouse - gesture mouse control')
+
+    const contextMenu = Menu.buildFromTemplate([
+      {
+        label: 'Show AirMouse',
+        click: () => {
+          if (!win) return
+          win.show()
+          win.focus()
+        },
+      },
+      {
+        label: 'Quit',
+        click: () => {
+          isQuitting = true
+          app.quit()
+        },
+      },
+    ])
+
+    tray.setContextMenu(contextMenu)
+    tray.on('click', () => {
+      if (!win) return
+      if (win.isVisible()) {
+        win.focus()
+      } else {
+        win.show()
+        win.focus()
+      }
+    })
   }
 }
 
@@ -60,7 +105,13 @@ app.on('activate', () => {
   // dock icon is clicked and there are no other windows open.
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow()
+  } else {
+    win?.show()
   }
+})
+
+app.on('before-quit', () => {
+  isQuitting = true
 })
 
 app.whenReady().then(createWindow)
