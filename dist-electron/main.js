@@ -1,172 +1,109 @@
-import { app, BrowserWindow, ipcMain, shell, nativeImage, Tray, Menu } from "electron";
-import { fileURLToPath } from "node:url";
-import path from "node:path";
-const __dirname$1 = path.dirname(fileURLToPath(import.meta.url));
-process.env.APP_ROOT = path.join(__dirname$1, "..");
-const VITE_DEV_SERVER_URL = process.env["VITE_DEV_SERVER_URL"];
-const MAIN_DIST = path.join(process.env.APP_ROOT, "dist-electron");
-const RENDERER_DIST = path.join(process.env.APP_ROOT, "dist");
-process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, "public") : RENDERER_DIST;
-let win;
-let tray = null;
-let isQuitting = false;
-function createWindow() {
-  win = new BrowserWindow({
-    icon: path.join(process.env.VITE_PUBLIC, "electron-vite.svg"),
+import { app as s, BrowserWindow as f, ipcMain as c, shell as v, nativeImage as R, Tray as g, Menu as E } from "electron";
+import { fileURLToPath as y } from "node:url";
+import i from "node:path";
+const p = i.dirname(y(import.meta.url));
+process.env.APP_ROOT = i.join(p, "..");
+const u = process.env.VITE_DEV_SERVER_URL, L = i.join(process.env.APP_ROOT, "dist-electron"), d = i.join(process.env.APP_ROOT, "dist");
+process.env.VITE_PUBLIC = u ? i.join(process.env.APP_ROOT, "public") : d;
+let e, a = null, m = !1;
+function h() {
+  if (e = new f({
+    icon: i.join(process.env.VITE_PUBLIC, "electron-vite.svg"),
     webPreferences: {
-      preload: path.join(__dirname$1, "preload.mjs")
+      preload: i.join(p, "preload.mjs")
     }
-  });
-  win.webContents.on("did-finish-load", () => {
-    win == null ? void 0 : win.webContents.send("main-process-message", (/* @__PURE__ */ new Date()).toLocaleString());
-  });
-  win.on("close", (event) => {
-    if (!isQuitting) {
-      event.preventDefault();
-      win == null ? void 0 : win.hide();
-    }
-  });
-  if (VITE_DEV_SERVER_URL) {
-    win.loadURL(VITE_DEV_SERVER_URL);
-  } else {
-    win.loadFile(path.join(RENDERER_DIST, "index.html"));
-  }
-  if (!tray) {
-    const emptyIcon = nativeImage.createEmpty();
-    tray = new Tray(emptyIcon);
-    tray.setToolTip("AirMouse - gesture mouse control");
-    const contextMenu = Menu.buildFromTemplate([
+  }), e.webContents.on("did-finish-load", () => {
+    e == null || e.webContents.send("main-process-message", (/* @__PURE__ */ new Date()).toLocaleString());
+  }), e.on("close", (r) => {
+    m || (r.preventDefault(), e == null || e.hide());
+  }), u ? e.loadURL(u) : e.loadFile(i.join(d, "index.html")), !a) {
+    const r = R.createEmpty();
+    a = new g(r), a.setToolTip("AirMouse - gesture mouse control");
+    const n = E.buildFromTemplate([
       {
         label: "Show AirMouse",
         click: () => {
-          if (!win) return;
-          win.show();
-          win.focus();
+          e && (e.show(), e.focus());
         }
       },
       {
         label: "Quit",
         click: () => {
-          isQuitting = true;
-          app.quit();
+          m = !0, s.quit();
         }
       }
     ]);
-    tray.setContextMenu(contextMenu);
-    tray.on("click", () => {
-      if (!win) return;
-      if (win.isVisible()) {
-        win.focus();
-      } else {
-        win.show();
-        win.focus();
-      }
+    a.setContextMenu(n), a.on("click", () => {
+      e && (e.isVisible() || e.show(), e.focus());
     });
   }
 }
-const gotTheLock = app.requestSingleInstanceLock();
-if (!gotTheLock) {
-  app.quit();
-} else {
-  app.on("second-instance", () => {
-    if (win) {
-      if (win.isMinimized()) win.restore();
-      win.show();
-      win.focus();
-    }
+const b = s.requestSingleInstanceLock();
+b ? (s.on("second-instance", () => {
+  e && (e.isMinimized() && e.restore(), e.show(), e.focus());
+}), s.on("window-all-closed", () => {
+  process.platform !== "darwin" && (s.quit(), e = null);
+}), s.on("activate", () => {
+  f.getAllWindows().length === 0 ? h() : e == null || e.show();
+}), s.on("before-quit", () => {
+  m = !0;
+}), s.whenReady().then(h)) : s.quit();
+c.on("open-external", (r, n) => {
+  typeof n == "string" && n.trim().length > 0 && (n.startsWith("http://") || n.startsWith("https://")) && v.openExternal(n).catch((t) => {
+    console.error("Failed to open external URL:", t);
   });
-  app.on("window-all-closed", () => {
-    if (process.platform !== "darwin") {
-      app.quit();
-      win = null;
-    }
-  });
-  app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
-    } else {
-      win == null ? void 0 : win.show();
-    }
-  });
-  app.on("before-quit", () => {
-    isQuitting = true;
-  });
-  app.whenReady().then(createWindow);
+});
+let o = null;
+async function l() {
+  o || (o = await import("@nut-tree-fork/nut-js"));
 }
-ipcMain.on("open-external", (_event, url) => {
-  if (typeof url === "string" && url.trim().length > 0) {
-    if (url.startsWith("http://") || url.startsWith("https://")) {
-      shell.openExternal(url).catch((err) => {
-        console.error("Failed to open external URL:", err);
-      });
-    }
+c.on("cursor:move", async (r, n) => {
+  try {
+    if (await l(), !o) return;
+    const t = await o.screen.width(), w = await o.screen.height(), T = Math.round(Math.min(Math.max(n.x, 0), 1) * t), _ = Math.round(Math.min(Math.max(n.y, 0), 1) * w);
+    await o.mouse.setPosition(new o.Point(T, _));
+  } catch (t) {
+    console.error("Failed to move cursor:", t);
   }
 });
-let nut = null;
-async function ensureNut() {
-  if (!nut) {
-    nut = await import("@nut-tree-fork/nut-js");
-  }
-}
-ipcMain.on("cursor:move", async (_event, payload) => {
+c.on("cursor:click", async (r, n) => {
   try {
-    await ensureNut();
-    if (!nut) return;
-    const width = await nut.screen.width();
-    const height = await nut.screen.height();
-    const targetX = Math.round(Math.min(Math.max(payload.x, 0), 1) * width);
-    const targetY = Math.round(Math.min(Math.max(payload.y, 0), 1) * height);
-    await nut.mouse.setPosition(new nut.Point(targetX, targetY));
-  } catch (err) {
-    console.error("Failed to move cursor:", err);
+    if (await l(), !o) return;
+    const t = n.button === "right" ? o.Button.RIGHT : o.Button.LEFT;
+    await o.mouse.click(t);
+  } catch (t) {
+    console.error("Failed to click:", t);
   }
 });
-ipcMain.on("cursor:click", async (_event, payload) => {
+c.on("cursor:mousedown", async (r, n) => {
   try {
-    await ensureNut();
-    if (!nut) return;
-    const btn = payload.button === "right" ? nut.Button.RIGHT : nut.Button.LEFT;
-    await nut.mouse.click(btn);
-  } catch (err) {
-    console.error("Failed to click:", err);
+    if (await l(), !o) return;
+    const t = n.button === "right" ? o.Button.RIGHT : o.Button.LEFT;
+    await o.mouse.pressButton(t);
+  } catch (t) {
+    console.error("Failed to mouse down:", t);
   }
 });
-ipcMain.on("cursor:mousedown", async (_event, payload) => {
+c.on("cursor:mouseup", async (r, n) => {
   try {
-    await ensureNut();
-    if (!nut) return;
-    const btn = payload.button === "right" ? nut.Button.RIGHT : nut.Button.LEFT;
-    await nut.mouse.pressButton(btn);
-  } catch (err) {
-    console.error("Failed to mouse down:", err);
+    if (await l(), !o) return;
+    const t = n.button === "right" ? o.Button.RIGHT : o.Button.LEFT;
+    await o.mouse.releaseButton(t);
+  } catch (t) {
+    console.error("Failed to mouse up:", t);
   }
 });
-ipcMain.on("cursor:mouseup", async (_event, payload) => {
+c.on("cursor:scroll", async (r, n) => {
   try {
-    await ensureNut();
-    if (!nut) return;
-    const btn = payload.button === "right" ? nut.Button.RIGHT : nut.Button.LEFT;
-    await nut.mouse.releaseButton(btn);
-  } catch (err) {
-    console.error("Failed to mouse up:", err);
-  }
-});
-ipcMain.on("cursor:scroll", async (_event, payload) => {
-  try {
-    await ensureNut();
-    if (!nut) return;
-    const amount = payload.amount ?? 3;
-    if (payload.direction === "up") {
-      await nut.mouse.scrollUp(amount);
-    } else {
-      await nut.mouse.scrollDown(amount);
-    }
-  } catch (err) {
-    console.error("Failed to scroll:", err);
+    if (await l(), !o) return;
+    const t = n.amount ?? 3;
+    n.direction === "up" ? await o.mouse.scrollUp(t) : await o.mouse.scrollDown(t);
+  } catch (t) {
+    console.error("Failed to scroll:", t);
   }
 });
 export {
-  MAIN_DIST,
-  RENDERER_DIST,
-  VITE_DEV_SERVER_URL
+  L as MAIN_DIST,
+  d as RENDERER_DIST,
+  u as VITE_DEV_SERVER_URL
 };

@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import './App.css'
 
-import * as MediapipeHands from '@mediapipe/hands'
 import { drawConnectors, drawLandmarks } from '@mediapipe/drawing_utils'
 
 type GestureEvent =
@@ -25,6 +24,7 @@ function App() {
   const [isTrackingActive, setIsTrackingActive] = useState(false)
   const [lastGesture, setLastGesture] = useState<GestureEvent | null>(null)
   const [sensitivity, setSensitivity] = useState(1)
+  const [isCameraMode, setIsCameraMode] = useState(false)
 
   useEffect(() => {
     let isCancelled = false
@@ -105,11 +105,12 @@ function App() {
           }
         })
 
+        // Dynamically import MediaPipe Hands so it works in both dev and build
+        const mpHands: any = await import('@mediapipe/hands')
         const HandsCtor: any =
-          // Different bundlers/versions expose Hands differently
-          (MediapipeHands as any).Hands ??
-          (MediapipeHands as any).default ??
-          MediapipeHands
+          mpHands?.Hands ?? mpHands?.default?.Hands ?? mpHands?.default ?? mpHands
+        const HAND_CONNECTIONS: any =
+          mpHands?.HAND_CONNECTIONS ?? mpHands?.default?.HAND_CONNECTIONS
 
         const hands = new HandsCtor({
           locateFile: (file: string) =>
@@ -145,7 +146,7 @@ function App() {
           ctx.globalAlpha = 1
 
           // Add a dark overlay to make the video appear significantly darker
-          ctx.fillStyle = 'rgba(15, 23, 42, 0.75)' // slate-900 with alpha
+          ctx.fillStyle = 'rgba(15, 23, 42, 0.55)' // slate-900 with alpha
           ctx.fillRect(0, 0, canvas.width, canvas.height)
 
           if (results.multiHandLandmarks && results.multiHandLandmarks.length) {
@@ -345,8 +346,6 @@ function App() {
             const lineColor = active ? '#f97316' : '#e5e7eb' // orange-500 vs neutral-200
             const dotColor = active ? '#fed7aa' : '#e5e7eb' // orange-200 vs neutral-200
 
-            const HAND_CONNECTIONS = (MediapipeHands as any).HAND_CONNECTIONS
-
             for (const landmarks of results.multiHandLandmarks) {
               drawConnectors(ctx, landmarks, HAND_CONNECTIONS, {
                 color: lineColor,
@@ -431,8 +430,17 @@ function App() {
         className="absolute inset-0 w-full h-full object-cover"
       />
 
+      {/* Camera mode toggle (top-right) */}
+      <button
+        type="button"
+        className="camera-toggle"
+        onClick={() => setIsCameraMode((prev) => !prev)}
+      >
+        {isCameraMode ? 'Show UI' : 'Camera mode'}
+      </button>
+
       {/* Gesture help (top-left) */}
-      {isTrackingActive && (
+      {isTrackingActive && !isCameraMode && (
         <div className="gesture-help">
           <h2 className="gesture-help-title">Gesture controls</h2>
           <ul className="gesture-help-list">
@@ -477,96 +485,102 @@ function App() {
       )}
 
       {/* Center content overlay */}
-      <div className="relative z-10 flex items-center justify-center min-h-screen px-4">
-        <div className="hero-card">
-          <h1 className="hero-title">AirMouse</h1>
-          <p className="hero-subtitle">
-            Control your cursor with just your hand — no physical mouse needed.
-          </p>
-          <p className="hero-team">
-            <span>Team Taurids</span> —{' '}
-            <button
-              type="button"
-              className="hero-link"
-              onClick={() =>
-                window.ipcRenderer?.send(
-                  'open-external',
-                  'https://www.linkedin.com/in/aahmedfaraz/',
-                )
-              }
-            >
-              Ahmed Faraz
-            </button>{' '}
-            &amp;{' '}
-            <button
-              type="button"
-              className="hero-link"
-              onClick={() =>
-                window.ipcRenderer?.send(
-                  'open-external',
-                  'https://www.linkedin.com/in/abdullah-khetran/',
-                )
-              }
-            >
-              Abdullah Khetran
-            </button>
-          </p>
-          <p className="hero-tagline">AI Genesis Hackathon 2025 • lablab.ai</p>
-
-          <div className="hero-status">
-            <span
-              className={`hero-status-pill ${
-                isTrackingActive
-                  ? 'hero-status-pill--active'
-                  : 'hero-status-pill--idle'
-              }`}
-            >
-              <span
-                className={`hero-status-dot ${
-                  isTrackingActive ? 'hero-status-dot--active' : ''
-                }`}
-              />
-              {isTrackingActive ? 'Tracking enabled' : 'Tracking paused'}
-            </span>
-            <p className="hero-status-instruction">
-              Open and close your hand{' '}
-              <span className="highlight">3 times</span> in front of the camera
-              to toggle <span className="app-name">AirMouse tracking</span> on
-              or off.
+      {!isCameraMode && (
+        <div className="relative z-10 flex items-center justify-center min-h-screen px-4">
+          <div className="hero-card">
+            <h1 className="hero-title">AirMouse</h1>
+            <p className="hero-subtitle">
+              Control your cursor with just your hand — no physical mouse
+              needed.
             </p>
-          </div>
+            <p className="hero-team">
+              <span>Team Taurids</span> —{' '}
+              <button
+                type="button"
+                className="hero-link"
+                onClick={() =>
+                  window.ipcRenderer?.send(
+                    'open-external',
+                    'https://www.linkedin.com/in/aahmedfaraz/',
+                  )
+                }
+              >
+                Ahmed Faraz
+              </button>{' '}
+              &amp;{' '}
+              <button
+                type="button"
+                className="hero-link"
+                onClick={() =>
+                  window.ipcRenderer?.send(
+                    'open-external',
+                    'https://www.linkedin.com/in/abdullah-khetran/',
+                  )
+                }
+              >
+                Abdullah Khetran
+              </button>
+            </p>
+            <p className="hero-tagline">
+              AI Genesis Hackathon 2025 • lablab.ai
+            </p>
 
-          <div className="sensitivity-control">
-            <span className="sensitivity-label">Gesture sensitivity</span>
-            <input
-              type="range"
-              min="0.5"
-              max="1.5"
-              step="0.1"
-              value={sensitivity}
-              onChange={(e) => {
-                const value = Number(e.target.value)
-                setSensitivity(value)
-                sensitivityRef.current = value
-              }}
-            />
-            <span className="sensitivity-value">
-              {sensitivity.toFixed(1)}x
-            </span>
-          </div>
+            <div className="hero-status">
+              <span
+                className={`hero-status-pill ${
+                  isTrackingActive
+                    ? 'hero-status-pill--active'
+                    : 'hero-status-pill--idle'
+                }`}
+              >
+                <span
+                  className={`hero-status-dot ${
+                    isTrackingActive ? 'hero-status-dot--active' : ''
+                  }`}
+                />
+                {isTrackingActive ? 'Tracking enabled' : 'Tracking paused'}
+              </span>
+              <p className="hero-status-instruction">
+                Open and close your hand{' '}
+                <span className="highlight">3 times</span> in front of the
+                camera to toggle{' '}
+                <span className="app-name">AirMouse tracking</span> on or off.
+              </p>
+            </div>
 
-          <div
-            className={`gesture-indicator ${
-              lastGesture ? 'gesture-indicator--visible' : 'gesture-indicator--hidden'
-            }`}
-          >
-            <span className="gesture-indicator-value">
-              {lastGesture ?? '\u00A0'}
-            </span>
-          </div>
+            <div className="sensitivity-control">
+              <span className="sensitivity-label">Gesture sensitivity</span>
+              <input
+                type="range"
+                min="0.5"
+                max="1.5"
+                step="0.1"
+                value={sensitivity}
+                onChange={(e) => {
+                  const value = Number(e.target.value)
+                  setSensitivity(value)
+                  sensitivityRef.current = value
+                }}
+              />
+              <span className="sensitivity-value">
+                {sensitivity.toFixed(1)}x
+              </span>
+            </div>
 
-          {error && <p className="hero-error">{error}</p>}
+            {error && <p className="hero-error">{error}</p>}
+          </div>
         </div>
+      )}
+
+      {/* Global gesture indicator (shown in both normal + camera modes) */}
+      <div
+        className={`gesture-indicator ${
+          lastGesture ? 'gesture-indicator--visible' : 'gesture-indicator--hidden'
+        }`}
+      >
+        <span className="gesture-indicator-value">
+          {lastGesture ?? '\u00A0'}
+        </span>
       </div>
 
       {/* Subtle gradient overlay for readability */}
