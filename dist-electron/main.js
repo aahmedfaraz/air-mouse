@@ -1,24 +1,26 @@
-import { app as s, BrowserWindow as f, ipcMain as c, shell as v, nativeImage as R, Tray as g, Menu as E } from "electron";
-import { fileURLToPath as y } from "node:url";
+import { app as s, BrowserWindow as f, ipcMain as c, shell as g, nativeImage as v, Tray as R, Menu as E } from "electron";
+import { fileURLToPath as b } from "node:url";
 import i from "node:path";
-const p = i.dirname(y(import.meta.url));
+const p = i.dirname(b(import.meta.url));
 process.env.APP_ROOT = i.join(p, "..");
 const u = process.env.VITE_DEV_SERVER_URL, L = i.join(process.env.APP_ROOT, "dist-electron"), d = i.join(process.env.APP_ROOT, "dist");
 process.env.VITE_PUBLIC = u ? i.join(process.env.APP_ROOT, "public") : d;
-let e, a = null, m = !1;
-function h() {
+let e, a = null, h = !1;
+function m() {
   if (e = new f({
     icon: i.join(process.env.VITE_PUBLIC, "electron-vite.svg"),
     webPreferences: {
-      preload: i.join(p, "preload.mjs")
+      preload: i.join(p, "preload.mjs"),
+      // Keep rendering & timers active when window is unfocused/minimized
+      backgroundThrottling: !1
     }
   }), e.webContents.on("did-finish-load", () => {
     e == null || e.webContents.send("main-process-message", (/* @__PURE__ */ new Date()).toLocaleString());
   }), e.on("close", (r) => {
-    m || (r.preventDefault(), e == null || e.hide());
+    h || (r.preventDefault(), e == null || e.hide());
   }), u ? e.loadURL(u) : e.loadFile(i.join(d, "index.html")), !a) {
-    const r = R.createEmpty();
-    a = new g(r), a.setToolTip("AirMouse - gesture mouse control");
+    const r = v.createEmpty();
+    a = new R(r), a.setToolTip("AirMouse - gesture mouse control");
     const n = E.buildFromTemplate([
       {
         label: "Show AirMouse",
@@ -29,7 +31,7 @@ function h() {
       {
         label: "Quit",
         click: () => {
-          m = !0, s.quit();
+          h = !0, s.quit();
         }
       }
     ]);
@@ -38,18 +40,18 @@ function h() {
     });
   }
 }
-const b = s.requestSingleInstanceLock();
-b ? (s.on("second-instance", () => {
+const y = s.requestSingleInstanceLock();
+y ? (s.on("second-instance", () => {
   e && (e.isMinimized() && e.restore(), e.show(), e.focus());
 }), s.on("window-all-closed", () => {
   process.platform !== "darwin" && (s.quit(), e = null);
 }), s.on("activate", () => {
-  f.getAllWindows().length === 0 ? h() : e == null || e.show();
+  f.getAllWindows().length === 0 ? m() : e == null || e.show();
 }), s.on("before-quit", () => {
-  m = !0;
-}), s.whenReady().then(h)) : s.quit();
+  h = !0;
+}), s.whenReady().then(m)) : s.quit();
 c.on("open-external", (r, n) => {
-  typeof n == "string" && n.trim().length > 0 && (n.startsWith("http://") || n.startsWith("https://")) && v.openExternal(n).catch((t) => {
+  typeof n == "string" && n.trim().length > 0 && (n.startsWith("http://") || n.startsWith("https://")) && g.openExternal(n).catch((t) => {
     console.error("Failed to open external URL:", t);
   });
 });

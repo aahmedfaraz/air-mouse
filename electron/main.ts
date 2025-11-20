@@ -31,6 +31,8 @@ function createWindow() {
     icon: path.join(process.env.VITE_PUBLIC, 'electron-vite.svg'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.mjs'),
+      // Keep rendering & timers active when window is unfocused/minimized
+      backgroundThrottling: false,
     },
   })
 
