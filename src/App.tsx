@@ -222,27 +222,14 @@ function App() {
               const DOUBLE_TAP_WINDOW_MS = 450
               const DRAG_HOLD_MS = 300
 
-              // Map thumb tip to absolute screen coordinates based on canvas position
-              if (canvas) {
-                const rect = canvas.getBoundingClientRect()
-                const thumbCanvasX = thumbTip.x * canvas.width
-                const thumbCanvasY = thumbTip.y * canvas.height
-
-                const scaleX = rect.width / canvas.width || 1
-                const scaleY = rect.height / canvas.height || 1
-
-                const clientX = rect.left + thumbCanvasX * scaleX
-                const clientY = rect.top + thumbCanvasY * scaleY
-
-                // Convert window-relative client coords to approximate screen coords
-                const screenX = window.screenX + clientX
-                const screenY = window.screenY + clientY
-
-                window.ipcRenderer?.send('cursor:move', {
-                  x: screenX,
-                  y: screenY,
-                })
-              }
+              // Map thumb tip to normalized screen coordinates and send to main
+              // Use direct x so cursor moves in same left/right direction as thumb.
+              const normalizedX = Math.min(Math.max(thumbTip.x, 0), 1)
+              const normalizedY = Math.min(Math.max(thumbTip.y, 0), 1)
+              window.ipcRenderer?.send('cursor:move', {
+                x: normalizedX,
+                y: normalizedY,
+              })
 
               // Pinch start
               if (isPinched && !wasPinched) {

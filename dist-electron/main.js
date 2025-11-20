@@ -114,8 +114,8 @@ ipcMain.on("cursor:move", async (_event, payload) => {
     if (!nut) return;
     const width = await nut.screen.width();
     const height = await nut.screen.height();
-    const targetX = Math.round(Math.min(Math.max(payload.x, 0), width));
-    const targetY = Math.round(Math.min(Math.max(payload.y, 0), height));
+    const targetX = Math.round(Math.min(Math.max(payload.x, 0), 1) * width);
+    const targetY = Math.round(Math.min(Math.max(payload.y, 0), 1) * height);
     await nut.mouse.setPosition(new nut.Point(targetX, targetY));
   } catch (err) {
     console.error("Failed to move cursor:", err);

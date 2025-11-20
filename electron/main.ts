@@ -157,10 +157,8 @@ ipcMain.on('cursor:move', async (_event, payload: { x: number; y: number }) => {
     const width = await nut.screen.width()
     const height = await nut.screen.height()
 
-    // Payload.x/y are absolute screen coordinates in CSS pixels.
-    // Clamp them to screen bounds and convert to integer.
-    const targetX = Math.round(Math.min(Math.max(payload.x, 0), width))
-    const targetY = Math.round(Math.min(Math.max(payload.y, 0), height))
+    const targetX = Math.round(Math.min(Math.max(payload.x, 0), 1) * width)
+    const targetY = Math.round(Math.min(Math.max(payload.y, 0), 1) * height)
 
     await nut.mouse.setPosition(new nut.Point(targetX, targetY))
   } catch (err) {
