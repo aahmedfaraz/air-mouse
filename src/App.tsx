@@ -329,6 +329,36 @@ function App() {
               })
             }
 
+            // Draw a virtual cursor shaped like the Windows arrow at the thumb tip
+            const thumb = primary[4]
+            const cursorX = thumb.x * canvas.width
+            const cursorY = thumb.y * canvas.height
+
+            ctx.save()
+            ctx.translate(cursorX, cursorY)
+            ctx.scale(1.2, 1.2)
+            ctx.shadowColor = 'rgba(15, 23, 42, 0.9)' // dark glow
+            ctx.shadowBlur = 14
+
+            ctx.beginPath()
+            // Arrow shape pointing up-left, similar to Windows cursor
+            ctx.moveTo(0, 0)
+            ctx.lineTo(0, 22)
+            ctx.lineTo(5, 17)
+            ctx.lineTo(9, 26)
+            ctx.lineTo(13, 24)
+            ctx.lineTo(9, 15)
+            ctx.lineTo(18, 15)
+            ctx.closePath()
+
+            ctx.fillStyle = '#ffffff'
+            ctx.fill()
+            ctx.lineWidth = 1.5
+            ctx.strokeStyle = '#020617' // slate-950 edge
+            ctx.stroke()
+
+            ctx.restore()
+
             ctx.shadowBlur = 0
           }
 
