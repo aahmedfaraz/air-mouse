@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import './App.css'
 
-import { Hands, HAND_CONNECTIONS } from '@mediapipe/hands'
+import * as MediapipeHands from '@mediapipe/hands'
 import { drawConnectors, drawLandmarks } from '@mediapipe/drawing_utils'
 
 type GestureEvent =
@@ -15,7 +15,8 @@ type GestureEvent =
 function App() {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
-  const handsRef = useRef<Hands | null>(null)
+  // Use a loose type here because Hands comes from a dynamic Mediapipe import
+  const handsRef = useRef<any | null>(null)
   const animationFrameRef = useRef<number | null>(null)
   const trackingActiveRef = useRef(false)
   const sensitivityRef = useRef(1) // 1 = default, higher = more sensitive
@@ -104,8 +105,14 @@ function App() {
           }
         })
 
-        const hands = new Hands({
-          locateFile: (file) =>
+        const HandsCtor: any =
+          // Different bundlers/versions expose Hands differently
+          (MediapipeHands as any).Hands ??
+          (MediapipeHands as any).default ??
+          MediapipeHands
+
+        const hands = new HandsCtor({
+          locateFile: (file: string) =>
             `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`,
         })
 
@@ -120,7 +127,7 @@ function App() {
         const canvas = canvasRef.current
         const ctx = canvas?.getContext('2d')
 
-        hands.onResults((results) => {
+        hands.onResults((results: any) => {
           if (!canvas || !ctx) return
 
           const videoWidth = results.image.width
@@ -215,14 +222,27 @@ function App() {
               const DOUBLE_TAP_WINDOW_MS = 450
               const DRAG_HOLD_MS = 300
 
-              // Map thumb tip to normalized screen coordinates and send to main
-              // Use direct x so cursor moves in same left/right direction as thumb.
-              const normalizedX = Math.min(Math.max(thumbTip.x, 0), 1)
-              const normalizedY = Math.min(Math.max(thumbTip.y, 0), 1)
-              window.ipcRenderer?.send('cursor:move', {
-                x: normalizedX,
-                y: normalizedY,
-              })
+              // Map thumb tip to absolute screen coordinates based on canvas position
+              if (canvas) {
+                const rect = canvas.getBoundingClientRect()
+                const thumbCanvasX = thumbTip.x * canvas.width
+                const thumbCanvasY = thumbTip.y * canvas.height
+
+                const scaleX = rect.width / canvas.width || 1
+                const scaleY = rect.height / canvas.height || 1
+
+                const clientX = rect.left + thumbCanvasX * scaleX
+                const clientY = rect.top + thumbCanvasY * scaleY
+
+                // Convert window-relative client coords to approximate screen coords
+                const screenX = window.screenX + clientX
+                const screenY = window.screenY + clientY
+
+                window.ipcRenderer?.send('cursor:move', {
+                  x: screenX,
+                  y: screenY,
+                })
+              }
 
               // Pinch start
               if (isPinched && !wasPinched) {
@@ -338,6 +358,8 @@ function App() {
             const lineColor = active ? '#f97316' : '#e5e7eb' // orange-500 vs neutral-200
             const dotColor = active ? '#fed7aa' : '#e5e7eb' // orange-200 vs neutral-200
 
+            const HAND_CONNECTIONS = (MediapipeHands as any).HAND_CONNECTIONS
+
             for (const landmarks of results.multiHandLandmarks) {
               drawConnectors(ctx, landmarks, HAND_CONNECTIONS, {
                 color: lineColor,
@@ -376,7 +398,17 @@ function App() {
         animationFrameRef.current = requestAnimationFrame(processFrame)
       } catch (err) {
         console.error(err)
-        setError('Unable to access camera. Please check permissions.')
+        let message = 'Unable to access camera. Please check permissions.'
+        if (err instanceof DOMException) {
+          if (err.name === 'NotReadableError' || err.message.includes('Device in use')) {
+            message =
+              'Camera is already in use by another app. Close any other AirMouse or camera apps and try again.'
+          } else if (err.name === 'NotAllowedError') {
+            message =
+              'Camera access was blocked. Please allow camera access for AirMouse in system settings.'
+          }
+        }
+        setError(message)
       }
     }
 

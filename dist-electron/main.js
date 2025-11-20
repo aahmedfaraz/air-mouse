@@ -64,23 +64,35 @@ function createWindow() {
     });
   }
 }
-app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") {
-    app.quit();
-    win = null;
-  }
-});
-app.on("activate", () => {
-  if (BrowserWindow.getAllWindows().length === 0) {
-    createWindow();
-  } else {
-    win == null ? void 0 : win.show();
-  }
-});
-app.on("before-quit", () => {
-  isQuitting = true;
-});
-app.whenReady().then(createWindow);
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on("second-instance", () => {
+    if (win) {
+      if (win.isMinimized()) win.restore();
+      win.show();
+      win.focus();
+    }
+  });
+  app.on("window-all-closed", () => {
+    if (process.platform !== "darwin") {
+      app.quit();
+      win = null;
+    }
+  });
+  app.on("activate", () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow();
+    } else {
+      win == null ? void 0 : win.show();
+    }
+  });
+  app.on("before-quit", () => {
+    isQuitting = true;
+  });
+  app.whenReady().then(createWindow);
+}
 ipcMain.on("open-external", (_event, url) => {
   if (typeof url === "string" && url.trim().length > 0) {
     if (url.startsWith("http://") || url.startsWith("https://")) {
@@ -102,8 +114,8 @@ ipcMain.on("cursor:move", async (_event, payload) => {
     if (!nut) return;
     const width = await nut.screen.width();
     const height = await nut.screen.height();
-    const targetX = Math.round(Math.min(Math.max(payload.x, 0), 1) * width);
-    const targetY = Math.round(Math.min(Math.max(payload.y, 0), 1) * height);
+    const targetX = Math.round(Math.min(Math.max(payload.x, 0), width));
+    const targetY = Math.round(Math.min(Math.max(payload.y, 0), height));
     await nut.mouse.setPosition(new nut.Point(targetX, targetY));
   } catch (err) {
     console.error("Failed to move cursor:", err);

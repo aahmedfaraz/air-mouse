@@ -90,31 +90,42 @@ function createWindow() {
   }
 }
 
-// Quit when all windows are closed, except on macOS. There, it's common
-// for applications and their menu bar to stay active until the user quits
-// explicitly with Cmd + Q.
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit()
-    win = null
-  }
-})
+// Single instance lock so only one AirMouse holds the camera/mouse
+const gotTheLock = app.requestSingleInstanceLock()
 
-app.on('activate', () => {
-  // On OS X it's common to re-create a window in the app when the
-  // dock icon is clicked and there are no other windows open.
-  if (BrowserWindow.getAllWindows().length === 0) {
-    createWindow()
-  } else {
-    win?.show()
-  }
-})
+if (!gotTheLock) {
+  app.quit()
+} else {
+  app.on('second-instance', () => {
+    if (win) {
+      if (win.isMinimized()) win.restore()
+      win.show()
+      win.focus()
+    }
+  })
 
-app.on('before-quit', () => {
-  isQuitting = true
-})
+  // Quit when all windows are closed, except on macOS.
+  app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') {
+      app.quit()
+      win = null
+    }
+  })
 
-app.whenReady().then(createWindow)
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow()
+    } else {
+      win?.show()
+    }
+  })
+
+  app.on('before-quit', () => {
+    isQuitting = true
+  })
+
+  app.whenReady().then(createWindow)
+}
 
 // Open external links in the user's default browser
 ipcMain.on('open-external', (_event, url: string) => {
@@ -146,8 +157,10 @@ ipcMain.on('cursor:move', async (_event, payload: { x: number; y: number }) => {
     const width = await nut.screen.width()
     const height = await nut.screen.height()
 
-    const targetX = Math.round(Math.min(Math.max(payload.x, 0), 1) * width)
-    const targetY = Math.round(Math.min(Math.max(payload.y, 0), 1) * height)
+    // Payload.x/y are absolute screen coordinates in CSS pixels.
+    // Clamp them to screen bounds and convert to integer.
+    const targetX = Math.round(Math.min(Math.max(payload.x, 0), width))
+    const targetY = Math.round(Math.min(Math.max(payload.y, 0), height))
 
     await nut.mouse.setPosition(new nut.Point(targetX, targetY))
   } catch (err) {
